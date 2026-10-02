@@ -1,0 +1,17 @@
+{
+  "name": "obsidian",
+  "version": "0.1.0",
+  "description": "Browse your Obsidian vault in a side pane, read notes and copy their paths",
+  "author": {
+    "name": "Chris Vanes"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "vaultPath": {
+      "type": "string",
+      "title": "Vault path",
+      "description": "Absolute path to the vault. Leave empty to use the vault Obsidian has open.",
+      "default": ""
+    }
+  }
+}
