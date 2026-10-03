@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { Elements, EngineInterface, FsEntry, Register, RenderSurface } from 'claude-code'
+import type { Elements, EngineInterface, FsEntry, Register, RenderElement, RenderSurface } from 'claude-code'
 
 import type { VaultView } from '../types'
 
@@ -70,20 +70,21 @@ async function copyPath($: EngineInterface, path: string, surface: RenderSurface
   $.ui.toast(copied.isCopied ? `Copied ${path}` : `Could not copy: ${copied.reason}`)
 }
 
-function header($: EngineInterface, ui: Ui, title: string, width: number) {
+function header($: EngineInterface, ui: Ui, buttons: RenderElement[], title: string, width: number) {
   const { Box, Text, Button } = ui
   const close = () => void $.ui.close({ id: PANE })
 
   return (
     <Box flexDirection="column" marginBottom={1}>
-      <Box flexDirection="row" gap={1}>
-        <Box flexGrow={1} flexShrink={1} minWidth={0}>
+      <Box flexDirection="row" gap={2}>
+        {buttons}
+        <Button key="close" hotkey="x" role="dismiss" dimColor onPress={close}>Close</Button>
+      </Box>
+      {title && (
+        <Box marginTop={1}>
           <Text bold color="magenta" wrap="truncate-start">{title}</Text>
         </Box>
-        <Box flexShrink={0}>
-          <Button key="close" hotkey="x" role="dismiss" dimColor onPress={close}>Close</Button>
-        </Box>
-      </Box>
+      )}
       <Text dimColor>{'─'.repeat(width)}</Text>
     </Box>
   )
@@ -94,17 +95,17 @@ async function renderNote($: EngineInterface, ui: Ui, root: string, file: string
   const path = joinPath(root, file)
   const back = () => void update($, view, v => ({ ...v, file: null }))
   const name = file.split('/').pop()!.replace(/\.md$/, '')
+  const buttons = [
+    <Button key="back" hotkey="b" onPress={back}>← Back</Button>,
+    <Button key="copy" hotkey="c" variant="primary" onPress={press => void copyPath($, path, press.surface)}>
+      Copy path
+    </Button>,
+  ]
 
   return (
     <Box flexDirection="column">
-      {header($, ui, name, width)}
-      <Box flexDirection="row" gap={2} marginBottom={1}>
-        <Button key="back" hotkey="b" onPress={back}>← Back</Button>
-        <Button key="copy" hotkey="c" variant="primary" onPress={press => void copyPath($, path, press.surface)}>
-          Copy path
-        </Button>
-      </Box>
-      <Text dimColor wrap="truncate-start">{parentOf(file) || 'Vault'}</Text>
+      {header($, ui, buttons, name, width)}
+      {parentOf(file) && <Text dimColor wrap="truncate-start">{parentOf(file)}</Text>}
       <Box marginTop={1}>
         <Markdown text={await readNote($, path)} />
       </Box>
@@ -120,12 +121,11 @@ async function renderFolder($: EngineInterface, ui: Ui, root: string, dir: strin
       entry.kind === 'dir' ? { dir: joinPath(dir, entry.name), file: null } : { ...v, file: joinPath(dir, entry.name) },
     )
   const up = () => void update($, view, () => ({ dir: parentOf(dir), file: null }))
-  const title = ['Vault', ...dir.split('/').filter(Boolean)].join(' › ')
+  const buttons = dir ? [<Button key="up" hotkey="u" onPress={up}>↑ Up</Button>] : []
 
   return (
     <Box flexDirection="column">
-      {header($, ui, title, width)}
-      {dir && <Button key="up" plain dimColor onPress={up}>↑ ..</Button>}
+      {header($, ui, buttons, dir.split('/').join(' › '), width)}
       {entries.length === 0 && <Text dimColor>No notes here.</Text>}
       {entries.map(entry => (
         <Button key={`entry:${entry.name}`} plain onPress={open(entry)}>
