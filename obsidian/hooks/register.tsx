@@ -76,9 +76,13 @@ function header($: EngineInterface, ui: Ui, title: string, width: number) {
 
   return (
     <Box flexDirection="column" marginBottom={1}>
-      <Box flexDirection="row" justifyContent="space-between">
-        <Text bold color="magenta" wrap="truncate-start">{title}</Text>
-        <Button key="close" hotkey="x" role="dismiss" plain dimColor onPress={close}>✕</Button>
+      <Box flexDirection="row" gap={1}>
+        <Box flexGrow={1} flexShrink={1} minWidth={0}>
+          <Text bold color="magenta" wrap="truncate-start">{title}</Text>
+        </Box>
+        <Box flexShrink={0}>
+          <Button key="close" hotkey="x" role="dismiss" dimColor onPress={close}>Close</Button>
+        </Box>
       </Box>
       <Text dimColor>{'─'.repeat(width)}</Text>
     </Box>
