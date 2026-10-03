@@ -48,7 +48,7 @@ test('lists folders before notes and hides dotfiles and attachments', OPTIONS, a
   const ui = await mountPane($)
 
   const labels = [await ui.find({ key: 'entry:Projects' }), await ui.find({ key: 'entry:Todo.md' })]
-  expect(labels.map(found => found?.text)).toEqual(['Projects/', 'Todo'])
+  expect(labels.map(found => found?.text)).toEqual(['▸ Projects', '  Todo'])
   expect(await ui.find({ key: 'entry:.obsidian' })).toBeUndefined()
   expect(await ui.find({ key: 'entry:image.png' })).toBeUndefined()
 })
@@ -82,4 +82,15 @@ test('uses the vault Obsidian has open when no vault path is set', async ($, on)
   const ui = await mountPane($)
 
   expect(await ui.find({ key: 'entry:Projects' })).toBeDefined()
+})
+
+test('the close button closes the pane', OPTIONS, async ($, on) => {
+  fakeVault(on)
+  const closed: string[] = []
+  on('ui.close', ($, e) => (closed.push(e.id), { value: undefined }))
+  const ui = await mountPane($)
+
+  await ui.press({ key: 'close' })
+
+  expect(closed).toEqual(['obsidian'])
 })

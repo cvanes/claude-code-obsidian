@@ -5,6 +5,7 @@ import type { VaultView } from '../types'
 
 const PANE = 'obsidian'
 const TITLE = 'Obsidian'
+const PANE_COLUMNS = 40
 const MAX_MARKDOWN = 10000
 const OBSIDIAN_CONFIG = 'Library/Application Support/obsidian/obsidian.json'
 
@@ -69,26 +70,45 @@ async function copyPath($: EngineInterface, path: string, surface: RenderSurface
   $.ui.toast(copied.isCopied ? `Copied ${path}` : `Could not copy: ${copied.reason}`)
 }
 
-async function renderNote($: EngineInterface, ui: Ui, root: string, file: string) {
-  const { Box, Text, Button, Markdown } = ui
-  const path = joinPath(root, file)
-  const back = () => void update($, view, v => ({ ...v, file: null }))
+function header($: EngineInterface, ui: Ui, title: string, width: number) {
+  const { Box, Text, Button } = ui
+  const close = () => void $.ui.close({ id: PANE })
 
   return (
-    <Box flexDirection="column">
-      <Box flexDirection="row" gap={1}>
-        <Button key="back" hotkey="b" onPress={back}>Back</Button>
-        <Button key="copy" hotkey="c" variant="primary" onPress={press => void copyPath($, path, press.surface)}>
-          Copy path
-        </Button>
+    <Box flexDirection="column" marginBottom={1}>
+      <Box flexDirection="row" justifyContent="space-between">
+        <Text bold color="magenta" wrap="truncate-start">{title}</Text>
+        <Button key="close" hotkey="x" role="dismiss" plain dimColor onPress={close}>✕</Button>
       </Box>
-      <Text dimColor>{file}</Text>
-      <Markdown text={await readNote($, path)} />
+      <Text dimColor>{'─'.repeat(width)}</Text>
     </Box>
   )
 }
 
-async function renderFolder($: EngineInterface, ui: Ui, root: string, dir: string) {
+async function renderNote($: EngineInterface, ui: Ui, root: string, file: string, width: number) {
+  const { Box, Text, Button, Markdown } = ui
+  const path = joinPath(root, file)
+  const back = () => void update($, view, v => ({ ...v, file: null }))
+  const name = file.split('/').pop()!.replace(/\.md$/, '')
+
+  return (
+    <Box flexDirection="column">
+      {header($, ui, name, width)}
+      <Box flexDirection="row" gap={2} marginBottom={1}>
+        <Button key="back" hotkey="b" onPress={back}>← Back</Button>
+        <Button key="copy" hotkey="c" variant="primary" onPress={press => void copyPath($, path, press.surface)}>
+          Copy path
+        </Button>
+      </Box>
+      <Text dimColor wrap="truncate-start">{parentOf(file) || 'Vault'}</Text>
+      <Box marginTop={1}>
+        <Markdown text={await readNote($, path)} />
+      </Box>
+    </Box>
+  )
+}
+
+async function renderFolder($: EngineInterface, ui: Ui, root: string, dir: string, width: number) {
   const { Box, Text, Button } = ui
   const entries = visibleEntries(await $.fs.list(joinPath(root, dir)))
   const open = (entry: FsEntry) => () =>
@@ -96,15 +116,16 @@ async function renderFolder($: EngineInterface, ui: Ui, root: string, dir: strin
       entry.kind === 'dir' ? { dir: joinPath(dir, entry.name), file: null } : { ...v, file: joinPath(dir, entry.name) },
     )
   const up = () => void update($, view, () => ({ dir: parentOf(dir), file: null }))
+  const title = ['Vault', ...dir.split('/').filter(Boolean)].join(' › ')
 
   return (
     <Box flexDirection="column">
-      <Text bold>{dir || 'Vault'}</Text>
-      {dir && <Button key="up" plain dimColor onPress={up}>../</Button>}
+      {header($, ui, title, width)}
+      {dir && <Button key="up" plain dimColor onPress={up}>↑ ..</Button>}
       {entries.length === 0 && <Text dimColor>No notes here.</Text>}
       {entries.map(entry => (
         <Button key={`entry:${entry.name}`} plain onPress={open(entry)}>
-          {entry.kind === 'dir' ? `${entry.name}/` : entry.name.replace(/\.md$/, '')}
+          {entry.kind === 'dir' ? `▸ ${entry.name}` : `  ${entry.name.replace(/\.md$/, '')}`}
         </Button>
       ))}
     </Box>
@@ -121,7 +142,7 @@ export const register: Register = (on, options) => {
   })
 
   on('command.run', { command: 'obsidian' }, async $ => {
-    await $.ui.open({ id: PANE, title: TITLE, focus: true })
+    await $.ui.open({ id: PANE, title: TITLE, focus: true, columns: PANE_COLUMNS })
     return { text: 'Obsidian pane opened.' }
   })
 
@@ -131,6 +152,8 @@ export const register: Register = (on, options) => {
     if (!root) return <ui.Text dimColor>No Obsidian vault found. Set vaultPath in /config.</ui.Text>
 
     const { dir, file } = await read($, view)
-    return file ? renderNote($, ui, root, file) : renderFolder($, ui, root, dir)
+    const width = Math.max(1, e.props.bodyColumns - 2)
+    const body = file ? await renderNote($, ui, root, file, width) : await renderFolder($, ui, root, dir, width)
+    return <ui.Box paddingX={1}>{body}</ui.Box>
   })
 }
