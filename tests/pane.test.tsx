@@ -69,7 +69,7 @@ test('opening a note renders its markdown', OPTIONS, async ($, on) => {
 
   const ui = await openPlan($)
 
-  expect(await ui.find({ type: 'Markdown' })).toMatchObject({ props: { text: FILES[PLAN] } })
+  expect(await ui.find({ key: 'body:1' })).toMatchObject({ props: { text: 'None' } })
 })
 
 test('opening a code file renders it as code', OPTIONS, async ($, on) => {
@@ -102,11 +102,10 @@ test('copy quotes a path that has spaces', OPTIONS, async ($, on) => {
   expect(copied).toEqual([`"${PLAN}"`])
 })
 
-test('selecting a section inserts it as a quote', OPTIONS, async ($, on) => {
+test('the button beside a section heading inserts it as a quote', OPTIONS, async ($, on) => {
   fakeVault(on)
   const inserted = recordPrompt(on)
   const ui = await openPlan($)
-  await ui.press({ key: 'sections' })
 
   await ui.press({ key: 'section:1' })
 
@@ -118,9 +117,9 @@ test('pressing a wikilink opens the linked note', OPTIONS, async ($, on) => {
   const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
   await ui.press({ key: 'entry:Todo.md' })
 
-  await ui.press({ key: 'note', link: { href: `file://${encodeURI(PLAN)}` } })
+  await ui.press({ key: 'preamble', link: { href: `file://${encodeURI(PLAN)}` } })
 
-  expect(await ui.find({ type: 'Markdown' })).toMatchObject({ props: { text: FILES[PLAN] } })
+  expect(await ui.find({ key: 'body:0' })).toMatchObject({ props: { text: 'Ship it' } })
 })
 
 test('search finds notes in subfolders', OPTIONS, async ($, on) => {

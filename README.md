@@ -10,7 +10,7 @@ Not affiliated with or endorsed by Obsidian.
 - View notes as rendered Markdown, code and text files with highlighting, and PNG images (in terminals that support the kitty graphics protocol)
 - **Insert** (`i`) puts an `@` reference to the file or folder into your prompt at the cursor – paths with spaces are quoted as `@"…"`
 - **Copy** (`c`) copies the path, quoted when it has spaces
-- **§ Sections** (`h`) lists a note's headings – pick one to insert that section as a quote
+- Press `⧉` beside a heading in a note to insert that section into your prompt as a quote
 - Click `[[wikilinks]]` in a note to open the linked note
 - Search the whole vault by name
 

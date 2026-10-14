@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { Elements, EngineInterface, FsEntry, Register, RenderElement, RenderSurface } from 'claude-code'
 
 import type { VaultView } from '../types'
-import { findNote, linkWikilinks, quoteSection, sections } from './markdown'
+import { findNote, linkWikilinks, quoteSection, sectionBody, splitNote } from './markdown'
 import type { Section } from './markdown'
 import {
   displayName,
@@ -29,7 +29,6 @@ const view = atom({ plugin: 'obsidian', key: 'view' } as const, {
   dir: '',
   file: null,
   query: '',
-  showSections: false,
 } as VaultView)
 
 let configuredVault = ''
@@ -108,7 +107,7 @@ async function copyText($: EngineInterface, text: string, surface: RenderSurface
 }
 
 async function openFile($: EngineInterface, file: string) {
-  await update($, view, v => ({ ...v, dir: parentOf(file), file, query: '', showSections: false }))
+  await update($, view, v => ({ ...v, dir: parentOf(file), file, query: '' }))
 }
 
 async function openLink($: EngineInterface, root: string, href: string) {
@@ -215,27 +214,45 @@ async function renderFolder($: EngineInterface, ctx: Context, { dir, query }: Va
   )
 }
 
-function sectionList($: EngineInterface, ctx: Context, notes: Section[], path: string) {
+function noteMarkdown($: EngineInterface, ctx: Context, key: string, text: string, toUrl: (target: string) => string | undefined) {
+  const { ui, root } = ctx
+  return (
+    <ui.Markdown
+      key={key}
+      text={truncate(linkWikilinks(text, toUrl), MAX_TEXT)}
+      onLinkPress={link => void (link.href.startsWith('file://') && openLink($, root, link.href))}
+    />
+  )
+}
+
+function sectionBlock(
+  $: EngineInterface,
+  ctx: Context,
+  section: Section,
+  i: number,
+  path: string,
+  toUrl: (target: string) => string | undefined,
+) {
   const { ui } = ctx
-  const insert = (section: Section) => () => void insertIntoPrompt($, quoteSection(section, reference(path)))
+  const body = sectionBody(section)
+  const insert = () => void insertIntoPrompt($, quoteSection(section, reference(path)))
 
   return (
-    <ui.Box flexDirection="column" marginBottom={1}>
-      {notes.length === 0 && <ui.Text dimColor>No headings in this note.</ui.Text>}
-      {notes.map((section, i) => (
-        <ui.Button key={`section:${i}`} plain onPress={insert(section)}>
-          {`${'  '.repeat(section.level - 1)}§ ${section.heading}`}
-        </ui.Button>
-      ))}
+    <ui.Box key={`block:${i}`} flexDirection="column" marginTop={1}>
+      <ui.Box flexDirection="row" gap={1}>
+        <ui.Box flexShrink={1}>
+          <ui.Text bold color={section.level === 1 ? 'magenta' : undefined}>{section.heading}</ui.Text>
+        </ui.Box>
+        <ui.Button key={`section:${i}`} plain dimColor onPress={insert}>⧉</ui.Button>
+      </ui.Box>
+      {body && noteMarkdown($, ctx, `body:${i}`, body, toUrl)}
     </ui.Box>
   )
 }
 
-async function renderNote($: EngineInterface, ctx: Context, path: string, showSections: boolean) {
+async function renderNote($: EngineInterface, ctx: Context, path: string) {
   const { ui, root } = ctx
-  const text = await readText($, path)
-  if (showSections) return sectionList($, ctx, sections(text), path)
-
+  const { preamble, sections } = splitNote(await readText($, path))
   const files = await vaultIndex($, root)
   const toUrl = (target: string) => {
     const found = findNote(files, target)
@@ -243,11 +260,10 @@ async function renderNote($: EngineInterface, ctx: Context, path: string, showSe
   }
 
   return (
-    <ui.Markdown
-      key="note"
-      text={truncate(linkWikilinks(text, toUrl), MAX_TEXT)}
-      onLinkPress={link => void (link.href.startsWith('file://') && openLink($, root, link.href))}
-    />
+    <ui.Box flexDirection="column">
+      {preamble && noteMarkdown($, ctx, 'preamble', preamble, toUrl)}
+      {sections.map((section, i) => sectionBlock($, ctx, section, i, path, toUrl))}
+    </ui.Box>
   )
 }
 
@@ -260,23 +276,21 @@ async function renderImage($: EngineInterface, ctx: Context, path: string) {
   return <ui.Image source={{ png: base64 }} columns={width} rows={Math.round(width / 2)} alt={displayName(path)} />
 }
 
-async function renderPreview($: EngineInterface, ctx: Context, file: string, showSections: boolean) {
+async function renderPreview($: EngineInterface, ctx: Context, file: string) {
   const { ui, root } = ctx
   const path = joinPath(root, file)
   const kind = fileKind(file)
 
-  if (kind === 'note') return renderNote($, ctx, path, showSections)
+  if (kind === 'note') return renderNote($, ctx, path)
   if (kind === 'image') return renderImage($, ctx, path)
   if (kind === 'code') return <ui.Code source={truncate(await readText($, path), MAX_TEXT)} path={file} wrap="wrap" />
   return <ui.Text dimColor>No preview for this file type. Insert or copy its path to share it.</ui.Text>
 }
 
-async function renderFile($: EngineInterface, ctx: Context, file: string, showSections: boolean) {
+async function renderFile($: EngineInterface, ctx: Context, file: string) {
   const { ui, root, surface } = ctx
   const path = joinPath(root, file)
-  const isNote = fileKind(file) === 'note'
-  const back = () => void update($, view, v => ({ ...v, file: null, showSections: false }))
-  const toggleSections = () => void update($, view, v => ({ ...v, showSections: !v.showSections }))
+  const back = () => void update($, view, v => ({ ...v, file: null }))
 
   const buttons = [
     <ui.Button key="back" hotkey="b" onPress={back}>← Back</ui.Button>,
@@ -286,17 +300,13 @@ async function renderFile($: EngineInterface, ctx: Context, file: string, showSe
     <ui.Button key="copy" hotkey="c" onPress={press => void copyText($, quotePath(path), press.surface ?? surface)}>
       Copy
     </ui.Button>,
-    ...(isNote
-      ? [<ui.Button key="sections" hotkey="h" onPress={toggleSections}>{showSections ? 'Note' : '§ Sections'}</ui.Button>]
-      : []),
   ]
 
   return (
     <ui.Box flexDirection="column">
       {toolbar($, ctx, buttons)}
       {heading(ctx, displayName(file), parentOf(file) || undefined)}
-      {showSections && <ui.Text dimColor>Select a section to insert it as a quote.</ui.Text>}
-      {await renderPreview($, ctx, file, showSections)}
+      {await renderPreview($, ctx, file)}
     </ui.Box>
   )
 }
@@ -325,7 +335,7 @@ export const register: Register = (on, options) => {
     const ctx: Context = { ui, root, width: Math.max(1, e.props.bodyColumns - 2), surface: e.surface }
     const current = await read($, view)
     const body = current.file
-      ? await renderFile($, ctx, current.file, current.showSections)
+      ? await renderFile($, ctx, current.file)
       : await renderFolder($, ctx, current)
     return <ui.Box paddingX={1} minHeight={e.props.scroll.bodyRows}>{body}</ui.Box>
   })

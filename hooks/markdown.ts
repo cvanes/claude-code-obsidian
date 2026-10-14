@@ -6,7 +6,10 @@ const HEADING = /^(#{1,6})\s+(.+?)\s*#*\s*$/
 const FENCE = /^\s*(```|~~~)/
 const WIKILINK = /(!?)\[\[([^\]|#]+)(#[^\]|]*)?(?:\|([^\]]+))?\]\]/g
 
-export function sections(markdown: string): Section[] {
+export type Note = { preamble: string; sections: Section[] }
+
+export function splitNote(markdown: string): Note {
+  const preamble: string[] = []
   const found: Section[] = []
   let isInFence = false
   for (const line of markdown.split('\n')) {
@@ -14,8 +17,16 @@ export function sections(markdown: string): Section[] {
     const heading = isInFence ? null : HEADING.exec(line)
     if (heading) found.push({ heading: heading[2]!, level: heading[1]!.length, text: line })
     else if (found.length > 0) found[found.length - 1]!.text += `\n${line}`
+    else preamble.push(line)
   }
-  return found.map(section => ({ ...section, text: section.text.trim() }))
+  return {
+    preamble: preamble.join('\n').trim(),
+    sections: found.map(section => ({ ...section, text: section.text.trim() })),
+  }
+}
+
+export function sectionBody(section: Section): string {
+  return section.text.split('\n').slice(1).join('\n').trim()
 }
 
 export function quoteSection(section: Section, source: string): string {

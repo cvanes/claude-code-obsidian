@@ -2,7 +2,6 @@ export type VaultView = {
   dir: string
   file: string | null
   query: string
-  showSections: boolean
 }
 
 declare module 'claude-code' {

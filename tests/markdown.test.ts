@@ -1,14 +1,14 @@
 import { expect, test } from 'claude-code/testing'
 
-import { findNote, linkWikilinks, sections } from '../hooks/markdown'
+import { findNote, linkWikilinks, splitNote } from '../hooks/markdown'
 import { reference } from '../hooks/paths'
 
-test('sections split a note by heading and ignore headings in code fences', () => {
-  const note = '# One\nText\n```\n# not a heading\n```\n## Two\nMore'
+test('a note splits into its preamble and sections, ignoring headings in code fences', () => {
+  const note = 'Intro\n# One\nText\n```\n# not a heading\n```\n## Two\nMore'
 
-  const found = sections(note)
+  const { preamble, sections } = splitNote(note)
 
-  expect(found.map(section => section.heading)).toEqual(['One', 'Two'])
+  expect([preamble, ...sections.map(section => section.heading)]).toEqual(['Intro', 'One', 'Two'])
 })
 
 test('wikilinks become links to the resolved note, keeping their alias', () => {
