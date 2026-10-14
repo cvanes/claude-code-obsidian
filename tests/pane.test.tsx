@@ -22,13 +22,14 @@ const PANE = {
 const entry = (name: string, kind: FsEntry['kind']): FsEntry => ({ name, kind, size: 0, mtimeMs: 0, isLink: false })
 
 const FOLDERS: Record<string, FsEntry[]> = {
-  [VAULT]: [entry('Todo.md', 'file'), entry('.obsidian', 'dir'), entry('data.json', 'file'), entry('Projects', 'dir')],
+  [VAULT]: [entry('Todo.md', 'file'), entry('Outline.md', 'file'), entry('.obsidian', 'dir'), entry('data.json', 'file'), entry('Projects', 'dir')],
   [`${VAULT}/Projects`]: [entry('Big Plan.md', 'file')],
 }
 
 const FILES: Record<string, string> = {
   [PLAN]: '# Goals\nShip it\n## Risks\nNone',
   [`${VAULT}/Todo.md`]: 'See [[Big Plan|the plan]]',
+  [`${VAULT}/Outline.md`]: '# Parent\n## Child\nText',
   [`${VAULT}/data.json`]: '{ "a": 1 }',
   '/home/Library/Application Support/obsidian/obsidian.json': JSON.stringify({
     vaults: { a: { path: '/closed' }, b: { path: VAULT, open: true } },
@@ -110,6 +111,15 @@ test('the button beside a section heading inserts it as a quote', OPTIONS, async
   await ui.press({ key: 'section:1' })
 
   expect(inserted).toEqual([`From @"${PLAN}":\n> ## Risks\n> None\n`])
+})
+
+test('only headings with content under them get an insert button', OPTIONS, async ($, on) => {
+  fakeVault(on)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+
+  await ui.press({ key: 'entry:Outline.md' })
+
+  expect([await ui.find({ key: 'section:0' }), await ui.find({ key: 'section:1' })].map(Boolean)).toEqual([false, true])
 })
 
 test('pressing a wikilink opens the linked note', OPTIONS, async ($, on) => {

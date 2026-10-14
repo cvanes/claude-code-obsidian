@@ -243,7 +243,7 @@ function sectionBlock(
         <ui.Box flexShrink={1}>
           <ui.Text bold color={section.level === 1 ? 'magenta' : undefined}>{section.heading}</ui.Text>
         </ui.Box>
-        <ui.Button key={`section:${i}`} plain dimColor onPress={insert}>⧉</ui.Button>
+        {body && <ui.Button key={`section:${i}`} plain dimColor onPress={insert}>⧉</ui.Button>}
       </ui.Box>
       {body && noteMarkdown($, ctx, `body:${i}`, body, toUrl)}
     </ui.Box>
