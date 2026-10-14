@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { Elements, EngineInterface, FsEntry, Register, RenderElement, RenderSurface } from 'claude-code'
 
-import type { SavedNotes, VaultView } from '../types'
+import type { VaultView } from '../types'
 import { findNote, linkWikilinks, quoteSection, sections } from './markdown'
 import type { Section } from './markdown'
 import {
@@ -23,8 +23,6 @@ const MAX_TEXT = 10000
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 const MAX_INDEX = 10000
 const MAX_MATCHES = 50
-const MAX_RECENT = 8
-const SHORTLIST = 5
 const OBSIDIAN_CONFIG = 'Library/Application Support/obsidian/obsidian.json'
 
 const view = atom({ plugin: 'obsidian', key: 'view' } as const, {
@@ -33,7 +31,6 @@ const view = atom({ plugin: 'obsidian', key: 'view' } as const, {
   query: '',
   showSections: false,
 } as VaultView)
-const saved = atom({ plugin: 'obsidian', key: 'saved' } as const, { recent: [], starred: [] } as SavedNotes)
 
 let configuredVault = ''
 let vault: Promise<string | undefined> | undefined
@@ -110,22 +107,8 @@ async function copyText($: EngineInterface, text: string, surface: RenderSurface
   $.ui.toast(copied.isCopied ? `Copied ${text}` : `Could not copy: ${copied.reason}`)
 }
 
-async function rememberSaved($: EngineInterface, change: (notes: SavedNotes) => SavedNotes) {
-  const next = change(await read($, saved))
-  await update($, saved, () => next)
-  await $.store.set('saved', next)
-}
-
 async function openFile($: EngineInterface, file: string) {
   await update($, view, v => ({ ...v, dir: parentOf(file), file, query: '', showSections: false }))
-  await rememberSaved($, notes => ({ ...notes, recent: [file, ...notes.recent.filter(f => f !== file)].slice(0, MAX_RECENT) }))
-}
-
-async function toggleStar($: EngineInterface, file: string) {
-  await rememberSaved($, notes => ({
-    ...notes,
-    starred: notes.starred.includes(file) ? notes.starred.filter(f => f !== file) : [file, ...notes.starred],
-  }))
 }
 
 async function openLink($: EngineInterface, root: string, href: string) {
@@ -163,18 +146,6 @@ function fileButton($: EngineInterface, ctx: Context, prefix: string, file: stri
     <ui.Button key={`${prefix}:${file}`} plain onPress={() => void openFile($, file)}>
       {`  ${label}`}
     </ui.Button>
-  )
-}
-
-function shortlist($: EngineInterface, ctx: Context, title: string, prefix: string, files: string[]) {
-  const { ui } = ctx
-  if (files.length === 0) return null
-
-  return (
-    <ui.Box flexDirection="column" marginBottom={1}>
-      <ui.Text bold>{title}</ui.Text>
-      {files.slice(0, SHORTLIST).map(file => fileButton($, ctx, prefix, file))}
-    </ui.Box>
   )
 }
 
@@ -219,7 +190,6 @@ function entryButton($: EngineInterface, ctx: Context, dir: string, entry: FsEnt
 
 async function renderFolder($: EngineInterface, ctx: Context, { dir, query }: VaultView) {
   const { ui, root } = ctx
-  const { recent, starred } = await read($, saved)
   const up = () => void update($, view, v => ({ ...v, dir: parentOf(dir), file: null }))
   const insertFolder = () => void insertIntoPrompt($, `${reference(joinPath(root, dir))} `)
   const buttons = dir
@@ -237,8 +207,6 @@ async function renderFolder($: EngineInterface, ctx: Context, { dir, query }: Va
         await renderMatches($, ctx, query)
       ) : (
         <ui.Box flexDirection="column">
-          {!dir && shortlist($, ctx, '★ Starred', 'star', starred)}
-          {!dir && shortlist($, ctx, '◷ Recent', 'recent', recent)}
           {heading(ctx, dir.split('/').join(' › '))}
           {(await listFolder($, root, dir)).map(entry => entryButton($, ctx, dir, entry))}
         </ui.Box>
@@ -306,8 +274,6 @@ async function renderPreview($: EngineInterface, ctx: Context, file: string, sho
 async function renderFile($: EngineInterface, ctx: Context, file: string, showSections: boolean) {
   const { ui, root, surface } = ctx
   const path = joinPath(root, file)
-  const { starred } = await read($, saved)
-  const isStarred = starred.includes(file)
   const isNote = fileKind(file) === 'note'
   const back = () => void update($, view, v => ({ ...v, file: null, showSections: false }))
   const toggleSections = () => void update($, view, v => ({ ...v, showSections: !v.showSections }))
@@ -320,7 +286,6 @@ async function renderFile($: EngineInterface, ctx: Context, file: string, showSe
     <ui.Button key="copy" hotkey="c" onPress={press => void copyText($, quotePath(path), press.surface ?? surface)}>
       Copy
     </ui.Button>,
-    <ui.Button key="star" hotkey="s" onPress={() => void toggleStar($, file)}>{isStarred ? '★ Starred' : '☆ Star'}</ui.Button>,
     ...(isNote
       ? [<ui.Button key="sections" hotkey="h" onPress={toggleSections}>{showSections ? 'Note' : '§ Sections'}</ui.Button>]
       : []),
@@ -343,8 +308,6 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'obsidian', description: 'Browse your Obsidian vault and share notes as context' })
-    const stored = (await $.store.get('saved')) as SavedNotes | undefined
-    if (stored) await update($, saved, () => stored)
     return next(e)
   })
 
@@ -364,6 +327,6 @@ export const register: Register = (on, options) => {
     const body = current.file
       ? await renderFile($, ctx, current.file, current.showSections)
       : await renderFolder($, ctx, current)
-    return <ui.Box paddingX={1}>{body}</ui.Box>
+    return <ui.Box paddingX={1} minHeight={e.props.scroll.bodyRows}>{body}</ui.Box>
   })
 }

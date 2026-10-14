@@ -1,7 +1,7 @@
 {
   "name": "obsidian",
-  "version": "0.2.0",
-  "description": "Browse your Obsidian vault in a Claude Code side pane and share notes as context: insert @ references, quote sections, search, star and follow wikilinks",
+  "version": "0.3.0",
+  "description": "Browse your Obsidian vault in a Claude Code side pane and share notes as context: insert @ references, quote sections, search and follow wikilinks",
   "author": {
     "name": "Chris Vanes"
   },

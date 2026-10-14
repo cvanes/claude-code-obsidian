@@ -1,4 +1,4 @@
-import { expect, mock, test } from 'claude-code/testing'
+import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { FsEntry, On } from 'claude-code'
 
@@ -36,7 +36,6 @@ const FILES: Record<string, string> = {
 }
 
 function fakeVault(on: On) {
-  mock.store(on)
   on('env.get', ($, e) => ({ value: e.name === 'HOME' ? '/home' : undefined }))
   on('fs.list', ($, e) => ({ value: FOLDERS[e.path] ?? [] }))
   on('fs.read', ($, e) => ({ value: FILES[e.path] ?? '' }))
@@ -131,17 +130,6 @@ test('search finds notes in subfolders', OPTIONS, async ($, on) => {
   await ui.input({ key: 'search', text: 'plan', kind: 'change' })
 
   expect(await ui.find({ key: 'match:Projects/Big Plan.md' })).toBeDefined()
-})
-
-test('starred notes are listed at the vault root', OPTIONS, async ($, on) => {
-  fakeVault(on)
-  const ui = await openPlan($)
-  await ui.press({ key: 'star' })
-
-  await ui.press({ key: 'back' })
-  await ui.press({ key: 'up' })
-
-  expect(await ui.find({ key: 'star:Projects/Big Plan.md' })).toBeDefined()
 })
 
 test('uses the vault Obsidian has open when no vault path is set', async ($, on) => {

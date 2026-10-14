@@ -13,7 +13,6 @@ Not affiliated with or endorsed by Obsidian.
 - **§ Sections** (`h`) lists a note's headings – pick one to insert that section as a quote
 - Click `[[wikilinks]]` in a note to open the linked note
 - Search the whole vault by name
-- **Star** (`s`) notes – starred and recently viewed notes show at the top and are remembered across sessions
 
 The vault is found automatically from Obsidian's own config (the vault Obsidian has open). Set **Vault path** in `/config` to use another.
 
