@@ -1,7 +1,0 @@
-{
-  "name": "gh-workflows",
-  "version": "0.1.0",
-  "description": "Live side pane of GitHub Actions runs for the current repo and branch",
-  "author": { "name": "Chris Vanes" },
-  "types": "./types/index.d.ts"
-}
